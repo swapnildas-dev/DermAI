@@ -1,0 +1,7 @@
+venv/
+data/
+*.keras
+__pycache__/
+*.pyc
+.env
+*.log
