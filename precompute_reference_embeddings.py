@@ -1,20 +1,17 @@
 """
 One-time offline script: builds the reference embedding set used by app.py's
-out-of-distribution (OOD) check. Extracts 1280-dim feature vectors from the
-EfficientNetB0 backbone (before the task-specific classification head) for a
-stratified sample of real HAM10000 images, then derives an outlier-distance
-threshold by checking how far a genuinely held-out set of real lesion images
-(the ISIC2018 test split, never used in training) sits from that reference
-set.
+out-of-distribution check. Extracts 1280-dim feature vectors from the
+EfficientNetB0 backbone (before the classification head) for a stratified
+sample of real HAM10000 images, then derives an outlier-distance threshold
+from how far a held-out set of real lesion images (the ISIC2018 test split)
+sits from that reference set.
 
-Why the backbone layer and not the fine-tuned "dense" layer: the 256-dim
-"dense" layer is fine-tuned to tell the 7 classes apart from each other, not
-to tell "is this a lesion at all" - testing showed real and non-lesion images
-overlapped a lot there. The 1280-dim backbone output (more general ImageNet-ish
-features) separated real dermoscopy images from screenshots, solid colors,
-and synthetic skin-toned blobs much more cleanly.
+Uses the backbone layer rather than the fine-tuned "dense" layer because the
+dense layer is tuned to tell the 7 classes apart, not to tell whether
+something is a lesion at all - it let real and non-lesion images overlap.
+The backbone's more general features separate them more cleanly.
 
-Run this once (or whenever the model is retrained) - not at app startup:
+Run this once (or whenever the model is retrained), not at app startup:
     python precompute_reference_embeddings.py
 """
 

@@ -24,9 +24,7 @@ from sklearn.utils import class_weight
 from tensorflow.keras import layers, models
 from tensorflow.keras.applications import EfficientNetB0
 
-# ---------------------------------------------------------------------------
 # Config
-# ---------------------------------------------------------------------------
 DATA_DIR = "data/dataverse_files"
 METADATA_PATH = os.path.join(DATA_DIR, "HAM10000_metadata")
 IMAGES_DIR = os.path.join(DATA_DIR, "HAM10000_images_combined_600x450")
@@ -37,19 +35,15 @@ SEED = 42
 
 # Phase 1: train just the new classification head, backbone frozen.
 INITIAL_EPOCHS = 10
-# Phase 2: unfreeze the top of the backbone and fine-tune end-to-end at a
-# low learning rate. Val loss was still improving at epoch 20 with no sign
-# of plateauing, so this budget was raised from 20 to give it more room.
+# Phase 2: unfreeze the backbone and fine-tune end-to-end at a low learning rate.
 FINE_TUNE_EPOCHS = 50
-# Freeze all backbone layers before this index; only layers from here on
-# get fine-tuned in phase 2 (keeps the generic low-level ImageNet features
-# in the early layers intact and only adapts higher-level features).
+# Freeze all backbone layers before this index; only layers from here on get
+# fine-tuned in phase 2, so the early generic ImageNet features stay intact.
 FINE_TUNE_AT = 100
 
-# If set and the file exists, main() skips straight to fine-tuning by
-# loading this checkpoint (weights, layer-trainable flags, and optimizer
-# state included) instead of rebuilding and re-running phase 1 from
-# scratch. Set to None to always train from scratch.
+# if set and the file exists, main() loads this checkpoint and jumps
+# straight to fine-tuning instead of rebuilding and running phase 1 again.
+# set to None to always train from scratch
 RESUME_CHECKPOINT = "skin_lesion_classifier.keras"
 
 CLASS_NAMES = ["akiec", "bcc", "bkl", "df", "mel", "nv", "vasc"]
@@ -58,9 +52,7 @@ tf.random.set_seed(SEED)
 np.random.seed(SEED)
 
 
-# ---------------------------------------------------------------------------
 # 1. Load metadata and build file paths / labels
-# ---------------------------------------------------------------------------
 def load_metadata():
     """Read the HAM10000 metadata CSV and attach the image file path and
     integer label for each row."""
@@ -81,9 +73,7 @@ def load_metadata():
     return df
 
 
-# ---------------------------------------------------------------------------
 # 2. Build a tf.data pipeline that decodes, resizes and normalizes images
-# ---------------------------------------------------------------------------
 def decode_and_preprocess(filepath, label):
     """Read an image file from disk, decode it, resize it, and scale pixel
     values to the [0, 1] range expected by the model."""
@@ -122,9 +112,7 @@ def make_dataset(filepaths, labels, training):
     return ds
 
 
-# ---------------------------------------------------------------------------
 # 3. EfficientNetB0 transfer-learning architecture
-# ---------------------------------------------------------------------------
 def build_model(num_classes):
     """EfficientNetB0 pretrained on ImageNet as the feature extractor, with a
     small classification head on top. The backbone starts frozen so only the
@@ -177,9 +165,7 @@ def make_callbacks():
     ]
 
 
-# ---------------------------------------------------------------------------
 # 4. Main training routine
-# ---------------------------------------------------------------------------
 def main():
     df = load_metadata()
     print(f"Loaded {len(df)} labeled images across {df['dx'].nunique()} classes.")
@@ -225,7 +211,7 @@ def main():
         model, base_model = build_model(num_classes=len(CLASS_NAMES))
         model.summary()
 
-        # ---- Phase 1: train the new head only, EfficientNetB0 backbone frozen ----
+        # Phase 1: train the new head only, EfficientNetB0 backbone frozen
         print("\n=== Phase 1: training classification head (backbone frozen) ===")
         model.fit(
             train_ds,
@@ -235,7 +221,7 @@ def main():
             callbacks=make_callbacks(),
         )
 
-        # ---- Unfreeze the top of the backbone for fine-tuning ----
+        # Unfreeze the top of the backbone for fine-tuning
         base_model.trainable = True
         for layer in base_model.layers[:FINE_TUNE_AT]:
             layer.trainable = False

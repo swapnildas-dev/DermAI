@@ -11,8 +11,7 @@ from PIL import Image
 
 from model import CLASS_NAMES, IMG_SIZE
 
-# class display names, risk tier, and the plain-english content for the glossary
-# and post-analysis info panel. mel/bcc are the scary ones.
+# class display names, risk tier, and content for the glossary and condition card
 CLASS_INFO = {
     "akiec": {
         "name": "Actinic Keratoses / Intraepithelial Carcinoma",
@@ -111,10 +110,8 @@ CLASS_INFO = {
 
 RISK_LEVELS = ["Low", "Medium", "High"]
 
-# sky blue brand palette (Ada Health / Apple Health vibe). #38BDF8 is the exact
-# accent but it's too light for actual text on white (2.1:1 contrast), so
-# there's a deeper same-hue shade for text/labels and a light tint for
-# backgrounds - keeps everything on-brand and still readable.
+# sky blue brand palette. #38BDF8 is too light for text on white (2.1:1
+# contrast), so ACCENT_TEXT is a deeper shade for text/labels
 ACCENT = "#38BDF8"           # illustration linework, muted chart bars, dropzone
 ACCENT_TEXT = "#0369A1"      # blue text sitting directly on white (headings, labels)
 ACCENT_TINT = "#E0F2FE"      # light background wash (dropzone, callout banner)
@@ -149,9 +146,7 @@ st.markdown(
 
     .stApp {{
         background-color: {SURFACE};
-        /* soft sky blue spotlight glow from the top, fading to white - an
-        intermediate color stop gives it a more natural falloff instead of a
-        flat fade, so it reads as a diffused light rather than a flat tint */
+        /* soft sky blue spotlight glow from the top, fading to white */
         background-image: radial-gradient(ellipse 1600px 900px at 50% -5%, {ACCENT_MUTED} 0%, rgba(224, 242, 254, 0.55) 35%, rgba(224, 242, 254, 0) 70%);
         background-attachment: fixed;
         font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -178,10 +173,9 @@ st.markdown(
     h1 .accent {{ color: {ACCENT_TEXT}; }}
     h1 .logo-icon {{ font-size: 0.75em; vertical-align: -0.05em; }}
 
-    /* fade + slide up on load, copied off rohitbiswas.com's hero (measured:
-    opacity 0->1, translateY 30px->0, ~0.7s ease-out). only applied on the
-    very first script run (see the session_state gate below) so it plays
-    once per session instead of replaying on every widget interaction */
+    /* fade + slide up on load (opacity 0->1, translateY 30px->0). only
+    applied on the first script run (session_state gate below) so it
+    doesn't replay on every widget interaction */
     @keyframes fadeInUp {{
         from {{ opacity: 0; transform: translateY(30px); }}
         to {{ opacity: 1; transform: translateY(0); }}
@@ -205,11 +199,9 @@ st.markdown(
         font-weight: 500;
     }}
 
-    /* cards - white, rounded, soft shadow instead of a hard border.
-    targeting by key (st-key-...) instead of data-testid="stVerticalBlockBorderWrapper" -
-    that testid doesn't exist in this streamlit version, border=True just sets
-    a plain 8px-radius border directly on the stVerticalBlock, so the only
-    reliable way to style specific cards is to key each one explicitly */
+    /* cards - white, rounded, soft shadow instead of a hard border. targeted
+    by key (st-key-...) since border=True alone gives a plain 8px-radius
+    border with no reliable selector to override per-card */
     .st-key-glossary_card, .st-key-questionnaire_card, .st-key-upload_card,
     .st-key-results_card, .st-key-condition_info_card {{
         border-radius: 20px !important;
@@ -236,8 +228,7 @@ st.markdown(
         color: {TEXT_PRIMARY} !important;
     }}
 
-    /* analyze button - big, sky blue, white text (deeper shade so white text
-    actually has contrast - the lighter accent only gives 2.1:1) */
+    /* analyze button - deeper blue than ACCENT so white text has contrast */
     .stButton > button {{
         background-color: {ACCENT_TEXT};
         color: #FFFFFF;
@@ -305,11 +296,9 @@ st.markdown(
     }}
 
     /* right column flip card - skin health tips on the front, condition info
-    on the back once there's a result. built as one raw HTML block (not
-    st.container) since the 3D flip needs both faces absolutely positioned
-    inside a shared perspective parent. animation is gated in python (see
-    render_flip_card) so it only plays on the actual flip/unflip rerun, not
-    on every unrelated widget interaction while a face is already showing */
+    on the back once there's a result. one raw HTML block since the 3D flip
+    needs both faces absolutely positioned inside a shared perspective
+    parent; flip animation is gated in python (see render_flip_card) */
     .flip-card {{
         perspective: 1500px;
         height: 640px;
@@ -405,9 +394,8 @@ MIN_DIMENSION = 100  # anything smaller than 100x100 is too low quality to bothe
 
 # sanity-check gate before the real model runs - not a classifier, just catches
 # obviously-wrong uploads (screenshots, random photos, blank/tiny images).
-# thresholds tuned against 150 real HAM10000 images so it doesn't reject
-# legit lesion photos (including pale/low-contrast skin) - see the min/p1/p5
-# stats gathered during tuning, with margin built in on every threshold
+# thresholds are tuned with margin so real HAM10000 photos (including pale
+# or low-contrast skin) don't get rejected
 def validate_lesion_image(pil_image):
     width, height = pil_image.size
     if width < MIN_DIMENSION or height < MIN_DIMENSION:
@@ -457,10 +445,7 @@ def render_invalid_image_error():
 # out-of-distribution check - catches things that dodge the pixel heuristics
 # above but still aren't real lesion photos (a realistic AI-generated skin/face
 # image, say). compares the upload's EfficientNetB0 backbone embedding against
-# a reference set of real HAM10000 embeddings; see
-# precompute_reference_embeddings.py for how the reference set + threshold
-# were built and validated (200/200 held-out real images passed, 14/15
-# synthetic non-lesion test cases correctly rejected)
+# a reference set of real HAM10000 embeddings; see precompute_reference_embeddings.py
 @st.cache_resource(show_spinner=False)
 def load_reference_embeddings():
     data = np.load("reference_embeddings.npz")
@@ -612,10 +597,9 @@ def render_flip_card():
     result = st.session_state.get("result")
     predicted_class = result["predicted_class"] if result else None
 
-    # card_flipped is the actual logical state; card_just_transitioned marks
-    # whether that state changed on THIS rerun specifically - only then do we
-    # attach the animation class, so flipping doesn't replay on every
-    # unrelated widget interaction while the card is just sitting there
+    # card_flipped is the logical state; card_just_transitioned marks whether
+    # that state changed on this rerun specifically, so the animation class
+    # only gets attached on an actual flip, not every unrelated rerun
     if "card_flipped" not in st.session_state:
         st.session_state.card_flipped = False
     if "card_just_transitioned" not in st.session_state:
@@ -665,13 +649,11 @@ def render_flip_card():
     )
 
 
-# --- hero section ---
-# the tagline/description/who-for lines use plain st.markdown (not raw HTML)
-# inside a keyed container, styled via the st-key- class streamlit generates -
-# raw unsafe_allow_html HTML skips streamlit's own :material/icon: substitution,
-# so the "who it's for" line needs native markdown for its icon to render
-# play the load-in animation only once per session - otherwise it'd replay
-# on every rerun (every widget click/change), not just the real first load
+# hero section
+# tagline/description/who-for lines use plain st.markdown (not raw HTML) so
+# the "who it's for" line's :material/icon: still renders - raw HTML skips
+# streamlit's own icon substitution
+# play the load-in animation only once per session, not on every rerun
 _hero_class = "fade-in-up" if "hero_animated" not in st.session_state else ""
 st.session_state.hero_animated = True
 st.markdown(
@@ -696,10 +678,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# --- how it works: 3 steps between the hero and the main app ---
-# plain emoji here, not :material/icon: shortcodes - those only get
-# substituted inside streamlit's own markdown pipeline, not raw HTML
-# (learned that one the hard way on the hero copy)
+# how it works: 3 steps between the hero and the main app
+# plain emoji here, not :material/icon: shortcodes - those only render
+# inside streamlit's own markdown pipeline, not raw HTML
 HOW_IT_WORKS_STEPS = [
     ("📤", "Upload photo", "Take or upload a clear close-up photo of the lesion you're concerned about."),
     ("🔬", "AI analysis", "DermAI compares it against patterns learned from 10,000+ clinical images."),
@@ -717,7 +698,7 @@ for step_col, (icon, title, description) in zip(step_cols, HOW_IT_WORKS_STEPS):
             unsafe_allow_html=True,
         )
 
-# --- three-column layout: condition glossary | main flow | condition info ---
+# three-column layout: condition glossary | main flow | condition info.
 # streamlit's real st.sidebar is a single left-only panel, so a left+right
 # pair is just three regular columns instead
 glossary_col, main_col, info_col = st.columns([1, 2, 1], gap="medium")
@@ -727,8 +708,8 @@ with glossary_col:
 
 with main_col:
     # questionnaire
-    # using st.container(border=True) here instead of raw open/close divs - markdown calls
-    # don't nest, learned that one the hard way
+    # st.container(border=True) rather than raw open/close divs - markdown
+    # calls don't nest across separate st.markdown calls
     with st.container(border=True, key="questionnaire_card"):
         st.markdown('<div class="section-title">Symptom questionnaire</div>', unsafe_allow_html=True)
 
@@ -765,12 +746,11 @@ with main_col:
         analyze_clicked = st.button("Analyze image", icon=":material/biotech:", width="stretch")
         st.caption("Accepted formats: close-up skin lesion photos, dermoscopy images.")
 
-    # analysis - runs once right when the button's clicked, then stashes the
-    # result in session_state. that stash matters: a plain `if analyze_clicked:`
-    # block (and anything inside it, like the "scan another image" button)
-    # disappears the instant ANY other button triggers the next rerun, since
-    # analyze_clicked itself reverts to False - so a button living in there
-    # can never have its own click processed
+    # analysis - runs once when the button's clicked, then stashes the result
+    # in session_state so it (and the "scan another image" button) survive
+    # later reruns. analyze_clicked itself reverts to False on the very next
+    # rerun, so anything only rendered inside `if analyze_clicked:` would
+    # otherwise vanish before a button inside it could ever be clicked
     if analyze_clicked:
         if uploaded_file is None:
             st.warning("Please upload an image before analyzing.")
@@ -854,8 +834,8 @@ with main_col:
             st.session_state.card_just_transitioned = True
             st.rerun()
 
-# right column - rendered after main_col so it reflects this rerun's result
-# state (set above), not last rerun's - otherwise the flip would lag a run behind
+# right column - rendered after main_col so it reflects this rerun's result,
+# not the previous one
 with info_col:
     render_flip_card()
 
