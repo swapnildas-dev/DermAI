@@ -6,11 +6,11 @@ AI-powered skin lesion classifier for early detection of skin conditions.
 
 **[Live Demo](https://dermai-7r4wobn2yv34nco2jay3jw.streamlit.app)**
 
-## Why this exists
+## Why did I build this?
 
 Skin cancer is the most common cancer in the United States, with over 5 million cases diagnosed each year. Melanoma alone accounts for the majority of skin cancer deaths — yet when caught early, the five-year survival rate is 99%. If it spreads, that drops to 35%.
 
-The problem is access. Most people don't see a dermatologist regularly, and by the time a concerning lesion gets checked, it can be too late. DermAI was built to lower that barrier — giving anyone a way to get an instant preliminary assessment of a skin lesion before deciding whether to seek professional care. It won't replace a dermatologist, but it can be the nudge that gets someone in the door early enough to matter.
+The problem is access. Most people don't see a dermatologist regularly, and by the time a concerning lesion gets checked, it can be too late. DermAI was built to lower that barrier — giving anyone a way to get an instant preliminary assessment of a skin lesion before deciding whether to seek professional care. It won't replace a dermatologist, but it can be the nudge that gets someone in the door early enough for a real impact.
 
 ## What it does
 
